@@ -1,4 +1,4 @@
-#Rust Notes
+# Rust Notes
 
 ## Some notes I found helpful when reading "The Book"
 
