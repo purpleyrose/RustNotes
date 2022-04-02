@@ -129,6 +129,46 @@ println!("{}", s); // This will print `hello, world`
 
 So why can a string literal not be mutated, but a `String` can be? The diffference is in how the two deal with memory.
 
+### Referances and borrowing
+
+Referances are a way to refer to a value without taking ownership of it. They are done using the `&` operator. As an example, say you want to calcaulte the length of a `String`, but you didn't want to take ownership of it:
+
+```rust
+fn main() {
+    let s1 = String::from("hello");
+
+    let len = calculate_length(&s1);
+
+    println!("The length of '{}' is {}.", s1, len);
+}
+
+fn calculate_length(s: &String) -> usize {
+    s.len()
+}
+```
+
+The `calculate_length` function takes in a `&String` paramater. This allows it to take in a referance to a string, instead of taking ownership of it directly.
+
+Borrowing in Rust is kind of like having a pointer. However, a referance is guareteened to point to a valid value, preventing null pointers. 
+
+The `&` syntax allows you to refer to a varaible, but not take ownsership of it. This may be benifcial as in some cases when taking ownership, you need to return the value back to its original owner. Just like any other variable, any variable decalred without `mut`, and this applies to borrowing as well. You cannot change a non-mutable referance. 
+
+Mutable referances can be done by doing a `mut &X` (where x is the name of the variable). For example:
+
+```rust
+fn main() {
+  let mut s = String::from("hello");
+
+  change(&mut s);
+}
+
+fn change(some_string: &mut String) {
+  some_string.push_str(", world");
+}
+```
+
+You can only have one mutable referance at a time, but unlimited immumutable referances. Multiple immutable referances are allowed because the others cannot overwrite eachother. The inverse is true for mutable referances, where they *can* overwrite each other, and that can cause problems if you have imutable referances to the same value. YOu may also not return a referance from a function.
+
 ### Memory & Allocation
 
 In the case of a string literal, we know the contents and size at compile time, meaning it's hardcoded into the executeable. This is why string literals are faster. However, this is at the cost of mutablility.
@@ -469,4 +509,236 @@ fn main() {
 }
 ```
 
-There is no built in hash map macro, unlike vectors. It also is not included in the prelude. Just like vectors, hash maps store their data on the heap. Unlike vectors, all values on it must be stored with the same type, same with the keys. 
+There is no built in hash map macro, unlike vectors. It also is not included in the prelude. Just like vectors, hash maps store their data on the heap. Unlike vectors, all values on it must be stored with the same type, same with the keys. A key can be overidden with a new value, like so:
+
+```rust
+fn main() {
+  use std::collections::HashMap;
+
+  let mut scores = HashMap::new();
+
+  scores.insert(String::from("Blue"), 10);
+  scores.insert(String::from("Blue"), 25);
+
+  println!("{#:?}" scores);
+}
+```
+
+This will overide blue to have the key 10.  You can also insert a value if theres no value like this, using the entry method from the Entry enum:
+
+```rust 
+fn main() {
+  use std::collections::HashMap;
+
+  let mut scores = HashMap::new();
+  scores.insert(String::from("Blue"), 10);
+
+  scores.entry(String::from("Yellow")).or_insert(50);
+  scores.entry(String::from("Blue")).or_insert(50);
+
+  println!("{:?}", scores);
+}
+```
+
+## Errors and Error Handiling
+
+### The Types of Errors
+
+Rust has two main types of errors, unrecoverable errors (invoked with the `panic!` macro), which will kill the proccess entirely.
+
+`panic!()` is invoked whenever there is an error that cannot be fixed by the program, causing it to crash. For instance, if you try to acess past a vector's indices, it will panic and halt the program.
+
+Most errors, however, are not serious enough to require the program to completly stop. Sometimes, you might be able to interpet and respond to the error. For example, if you try to open a file and it fails because the file doesn't exist, you might want to create the file instead of killing the process.
+
+The `Result` enum has two variants: `Ok` and `Err`. It looks like this: 
+
+```rust
+
+enum Result<T, E> {
+  Ok(T),
+  Err(E),
+}
+```
+
+`T` represents the type that will be returned if the function suceseds, and `E` represents the type of the error that will be returned in a failure case.
+For instaces, the `File::open` method uses the `Result` enum as its error handerler.It returns `Result<File, std::io::Error>`, where `T` and `E` have been replaced. This return type means the call to `File::open` might suceeed and return a file handle that we can read or write to. The function could also fails, such in the case the file doesn't exist, or the program doesn't have persmission to it. If it succeseds, the variable that the method is equal to will either be a instance of `Ok` or `Err` depending on the result of the the method.
+
+You can also take different actions depending on the result of the function, for instance:
+
+```rust
+use std::fs::File;
+
+fn main() {
+  let f = File::open("hello.txt");
+
+  let f = match f {
+    Ok(file) => file,
+    Err(error) => panic!("Problem openiong the file: {:?}", error),
+  };
+}
+```
+
+This tells Rust that if the result is `Ok`, return the inner `file` value out of the `Ok` variant, and we then assign that file handle value to the variable `f`. The other arm tells the program to panic that the file doesn't exist. 
+
+You can also match depending on the spesfic error. For example:
+
+```rust
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let f = File::open("hello.txt");
+
+    let f = match f {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,
+                Err(e) => panic!("Problem creating the file: {:?}", e),
+            },
+            other_error => {
+                panic!("Problem opening the file: {:?}", other_error)
+            }
+        },
+    };
+}
+```
+
+#### The Unwrap & Expect Function
+
+While match statements are nice and all, they can get a bit too verbose in situations like this. This is why Rust has two functions for dealing with this. 
+
+One of them is called `unwrap()`. If the result value is `Ok` then `unwrap()` will reutnr the value to be `Ok`. If the Result is `Err` variant, it will call the `panic!` macro. Here is an example:
+
+```rust
+use std::fs::File;
+
+fn main() {
+  let f = File::open("Hello.txt").unwrap();
+}
+```
+
+If there is no file, it will call `panic!`, doing the same thing as before with way less lines of code.
+
+The expect method works similar, though it provides a different syntax than unwrap. Here's an example:
+
+```rust
+use std::fs::File;
+
+fn main() {
+  let f = File::open("hello.txt").expect("Failed to open hello.txt");
+}
+```
+
+The error message will look like this:
+
+```
+thread 'main' panicked at 'Failed to open hello.txt: Error { repr: Os { code:
+2, message: "No such file or directory" } }', src/libcore/resuld  t.rs:906:4
+```
+
+Because of this, the error is easier to track down then while using `unwrap`, which will just show the type of error, rather than where it occured.
+
+#### Propogating Errors
+
+When you're writing a function that might call something that could fail, you can return the error to the calling code to decide what to do. This is called propagating the error and gives more control about what to do in the case of an error. This example shows how that can be done:
+
+```rust
+fn main() {
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let f = File::open("hello.txt");
+
+    let mut f = match f {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+
+    let mut s = String::new();
+
+    match f.read_to_string(&mut s) {
+        Ok(_) => Ok(s),
+        Err(e) => Err(e),
+    }
+}
+}
+```
+
+This function starts by trying to open a file called "hello.txt", it will then match the variable to if the `open` method succeeds, if it does, it will set `f` to file. If it fails, it will return an error. It will return this error to whatever code called the function. There is a more effcient shortcut to replicate this behaviour, the `?` operator. It will do the exact same thing. Here is the `read_username_from_file()` function using the question mark:
+
+```rust
+use std::fs::File;
+use std::io;
+use std::io::Read;
+
+fn read_username_from_file() -> Result<String. io::Error> {
+  let mut f = File::open("hello.txt")?;
+  let mut s = String::new();
+  f.read_to_string(&mut s)?;
+  Ok(s)
+}
+```
+
+A `?` placed after a `Result` value works the same as the previous `match` expressions. If the value is `Ok`,  the value of `Ok` will get returned from the expression, and it will continue. If the value is an `Err`, it will get returned from the whole function as if it was returning explicity. 
+
+There is one difference, however, betweeen the two expressions. Error values that have the `?` operator called on them go through the `from` function, defined using the `From` trait in the standard libary,, which will convert errors from one type to another. When the `?` operator calls the from function, the error type is converted to the type defined in the return type of the function.
+
+In the prevois code example, the `?` at the end of `File::open()` will returnthe value inside an `Ok` to `f`. If an error occurs, it will exit out of the function and return `Err` to the calling code. 
+
+The `?` operator can eliminate a lot of boilerplate code by simplifiying error propagation. You could make the previous code even shorter by chaning the method calls after the `?` like so:
+
+```rust
+use std::fs::File;
+use std::io;
+use std::io::Read;
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut s = String::new();
+
+    File::open("hello.txt")?.read_to_string(&mut s)?;
+
+    Ok(s)
+}
+```
+
+The smallest implimentation would be this:
+
+```rust
+use std::{fs::File, io, io::Read}; fn read_username_from_file() -> Result<String, io::Error> {let mut s = String::new(); File::open("hello.txt")?.read_to_string(&mut s)?; Ok(s)}
+```
+
+The problem of course, is that this isn't readable.
+
+The `?` operator can only be used in functions that have a return type compatioble with the value `?` is used on. THis is because it will return an `Err` in the case of an error. For instance, trying to use this on a main  function will cause errors.
+
+```rust
+use std::fs::File;
+
+fn main() {
+  let f = File::open("Hello.txt")?;
+}
+```
+
+This will generate the following errror:
+
+```
+error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+   --> src/main.rs:4:36
+    |
+3   | / fn main() {
+4   | |     let f = File::open("hello.txt")?;
+    | |                                    ^ cannot use the `?` operator in a function that returns `()`
+5   | | }
+    | |_- this function should return `Result` or `Option` to accept `?`
+    |
+    = help: the trait `FromResidual<Result<Infallible, std::io::Error>>` is not implemented for `()`
+note: required by `from_residual`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `error-handling` due to previous error
+```
+
+
+So how should you decide when to or not to panic? When  you code panics, there is no way to recover. The program is killed and does not run. 
