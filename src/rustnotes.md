@@ -149,9 +149,9 @@ fn calculate_length(s: &String) -> usize {
 
 The `calculate_length` function takes in a `&String` paramater. This allows it to take in a referance to a string, instead of taking ownership of it directly.
 
-Borrowing in Rust is kind of like having a pointer. However, a referance is guareteened to point to a valid value, preventing null pointers. 
+Borrowing in Rust is kind of like having a pointer. However, a referance is guareteened to point to a valid value, preventing null pointers.
 
-The `&` syntax allows you to refer to a varaible, but not take ownsership of it. This may be benifcial as in some cases when taking ownership, you need to return the value back to its original owner. Just like any other variable, any variable decalred without `mut`, and this applies to borrowing as well. You cannot change a non-mutable referance. 
+The `&` syntax allows you to refer to a varaible, but not take ownsership of it. This may be benifcial as in some cases when taking ownership, you need to return the value back to its original owner. Just like any other variable, any variable decalred without `mut`, and this applies to borrowing as well. You cannot change a non-mutable referance.
 
 Mutable referances can be done by doing a `mut &X` (where x is the name of the variable). For example:
 
@@ -167,7 +167,7 @@ fn change(some_string: &mut String) {
 }
 ```
 
-You can only have one mutable referance at a time, but unlimited immumutable referances. Multiple immutable referances are allowed because the others cannot overwrite eachother. The inverse is true for mutable referances, where they *can* overwrite each other, and that can cause problems if you have imutable referances to the same value. YOu may also not return a referance from a function.
+You can only have one mutable referance at a time, but unlimited immumutable referances. Multiple immutable referances are allowed because the others cannot overwrite eachother. The inverse is true for mutable referances, where they _can_ overwrite each other, and that can cause problems if you have imutable referances to the same value. YOu may also not return a referance from a function.
 
 ### Memory & Allocation
 
@@ -496,7 +496,7 @@ To summarize, strings are complicated, and different languages resolve this in v
 
 #### Hash Maps
 
-A hash map cotanins a set of values and keys. You can make one like so: 
+A hash map cotanins a set of values and keys. You can make one like so:
 
 ```rust
 fn main() {
@@ -526,7 +526,7 @@ fn main() {
 
 This will overide blue to have the key 10.  You can also insert a value if theres no value like this, using the entry method from the Entry enum:
 
-```rust 
+```rust
 fn main() {
   use std::collections::HashMap;
 
@@ -550,7 +550,7 @@ Rust has two main types of errors, unrecoverable errors (invoked with the `panic
 
 Most errors, however, are not serious enough to require the program to completly stop. Sometimes, you might be able to interpet and respond to the error. For example, if you try to open a file and it fails because the file doesn't exist, you might want to create the file instead of killing the process.
 
-The `Result` enum has two variants: `Ok` and `Err`. It looks like this: 
+The `Result` enum has two variants: `Ok` and `Err`. It looks like this:
 
 ```rust
 
@@ -578,7 +578,7 @@ fn main() {
 }
 ```
 
-This tells Rust that if the result is `Ok`, return the inner `file` value out of the `Ok` variant, and we then assign that file handle value to the variable `f`. The other arm tells the program to panic that the file doesn't exist. 
+This tells Rust that if the result is `Ok`, return the inner `file` value out of the `Ok` variant, and we then assign that file handle value to the variable `f`. The other arm tells the program to panic that the file doesn't exist.
 
 You can also match depending on the spesfic error. For example:
 
@@ -606,7 +606,7 @@ fn main() {
 
 #### The Unwrap & Expect Function
 
-While match statements are nice and all, they can get a bit too verbose in situations like this. This is why Rust has two functions for dealing with this. 
+While match statements are nice and all, they can get a bit too verbose in situations like this. This is why Rust has two functions for dealing with this.
 
 One of them is called `unwrap()`. If the result value is `Ok` then `unwrap()` will reutnr the value to be `Ok`. If the Result is `Err` variant, it will call the `panic!` macro. Here is an example:
 
@@ -681,11 +681,11 @@ fn read_username_from_file() -> Result<String. io::Error> {
 }
 ```
 
-A `?` placed after a `Result` value works the same as the previous `match` expressions. If the value is `Ok`,  the value of `Ok` will get returned from the expression, and it will continue. If the value is an `Err`, it will get returned from the whole function as if it was returning explicity. 
+A `?` placed after a `Result` value works the same as the previous `match` expressions. If the value is `Ok`,  the value of `Ok` will get returned from the expression, and it will continue. If the value is an `Err`, it will get returned from the whole function as if it was returning explicity.
 
 There is one difference, however, betweeen the two expressions. Error values that have the `?` operator called on them go through the `from` function, defined using the `From` trait in the standard libary,, which will convert errors from one type to another. When the `?` operator calls the from function, the error type is converted to the type defined in the return type of the function.
 
-In the prevois code example, the `?` at the end of `File::open()` will returnthe value inside an `Ok` to `f`. If an error occurs, it will exit out of the function and return `Err` to the calling code. 
+In the prevois code example, the `?` at the end of `File::open()` will returnthe value inside an `Ok` to `f`. If an error occurs, it will exit out of the function and return `Err` to the calling code.
 
 The `?` operator can eliminate a lot of boilerplate code by simplifiying error propagation. You could make the previous code even shorter by chaning the method calls after the `?` like so:
 
@@ -723,7 +723,7 @@ fn main() {
 
 This will generate the following errror:
 
-```
+```err
 error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
    --> src/main.rs:4:36
     |
@@ -740,5 +740,300 @@ For more information about this error, try `rustc --explain E0277`.
 error: could not compile `error-handling` due to previous error
 ```
 
+So how should you decide when to or not to panic? When  you code panics, there is no way to recover. The program is killed and does not run.
 
-So how should you decide when to or not to panic? When  you code panics, there is no way to recover. The program is killed and does not run. 
+There are 3 main guidlines as whether to panic or not. You should only panic if your code might end up in a bad state. A bad state is when some assumption, guarantee contract or invariant has been broken, such as when using invalid or contradictory values, or missing values plus one of the following:
+
+* The bad state is something that is unexpected
+* You code after thios point needs to rely on not being in this bad state
+* Theres not a good way to encode this information in the types you use
+
+## Generics
+All programing languages have ways of dealing with duplication of concepts. In
+Rust, one tool for this generics. Generics are an abstract stand-ins for
+concrete types or other properties. Similar to the way a function can take in
+paramters with an unknown value, functions can take paramters with some generic
+type, instead of a concrete type like `i32` or `String`. We've already used
+generics in the past, like with `Option<T>`, and with `Vec<T>` or `<HashMap<K, V>`, and with `Result<T, E>`. We will now talk about how to define custom
+gener will now talk about how to define custom generics, including functions,
+types and methods with generics.
+
+### Extracting functions
+
+Let's look at how to remove duplication that doesn't involve gneric types by extracting a function. 
+
+Consider a short program that find the largest number in a list:
+
+```rust
+fn main() {
+  let number_list = vec![34, 50, 25, 100, 65];
+
+  let mut largest = number_list[0];
+
+  for number in number_list {
+    if number > largest {
+      largest = number;
+    }
+  }
+
+  println!("The largest number is {}", largest);
+}
+```
+
+To find the largest number in two sets of numbers, we duplicate the code and logic in two different places:
+
+```rust
+fn main() {
+    let number_list = vec![34, 50, 25, 100, 65];
+
+    let mut largest = number_list[0];
+
+    for number in number_list {
+        if number > largest {
+            largest = number;
+        }
+    }
+
+    println!("The largest number is {}", largest);
+
+    let number_list = vec![102, 34, 6000, 89, 54, 2, 43, 8];
+
+    let mut largest = number_list[0];
+
+    for number in number_list {
+        if number > largest {
+            largest = number;
+        }
+    }
+
+    println!("The largest number is {}", largest);
+}
+```
+
+While this does work, duplicating code is tedious and error prone. You would also need to update the code in multiple places when you want to change it.
+
+To eliminate this, we can create an abstraction by defining a function that takes any list of intergeers as a paramter. This makes the code easier to read and less error prone.
+
+```rust
+fn largest(list: &[i32]) -> i32 {
+  let mut largest = list[0];
+
+  for &item in list {
+    if item > largest {
+      largest = item;
+    }
+  }
+  largest
+}
+
+fn main() {
+   let number_list = vec![34, 50, 25, 100, 65];
+
+    let result = largest(&number_list);
+    println!("The largest number is {}", result);
+
+    let number_list = vec![102, 34, 6000, 89, 54, 2, 43, 8];
+
+    let result = largest(&number_list);
+    println!("The largest number is {}", result);
+}
+```
+
+This is similar to generics. Instead of abstracting the operation, generics abstract the type.
+
+### Generic Data Types
+
+We can use generics to create definations for items like function signature or structs, which we can then use with mayn different conrrete data types.
+
+
+When defining a function that uses generics, we place the generics in the signature of the function where data types would ususally be defined. If you wanted to for instace, find the largest value in a char and a i32 list without generics, it would look like this: 
+
+```rust
+fn largest_i32(list: &[i32]) -> i32 {
+    let mut largest = list[0];
+
+    for &item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+
+    largest
+}
+
+fn largest_char(list: &[char]) -> char {
+    let mut largest = list[0];
+
+    for &item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+
+    largest
+}
+
+fn main() {
+    let number_list = vec![34, 50, 25, 100, 65];
+
+    let result = largest_i32(&number_list);
+    println!("The largest number is {}", result);
+
+    let char_list = vec!['y', 'm', 'a', 'q'];
+
+    let result = largest_char(&char_list);
+    println!("The largest char is {}", result);
+}
+```
+
+This has the same problem as before; it will work, but it's messy and error-prone. Let's change this to use generics. To use generics as a paramater, you'il need to name the paramter. Usually, `T` is used for types. By convention, parameter names in Rust are short, usually a single letter, and Rust's naming convention for them is CamelCase. `T` is almost always short for "type".
+
+To define a generic largest function, place the type name declarations inside angle brackets (`<>`), between the name of the function and the paramter list:
+
+```rust
+fn largest<T>(list: &[T]) -> T {
+```
+
+This is the largest function using generics:
+
+```rust
+fn largest<T>(list: &[T]) -> T {
+  let mut largest = list[0];
+  
+  for &item in list {
+    if item > largest {
+      largest = item;
+    }
+  }
+  largest
+}
+```
+
+This code will not compile, because `T` cannot be compared for all types. 
+
+### Genric Structs
+
+We can also define structs to use a generic type parameter in one or more fields using the arrow bracket syntax. The following shows how you can define a point with generic fields: 
+
+```rust
+struct Point<T> {
+  x: T,
+  y: T,
+}
+
+fn main() {
+  let integer = Point {x: 5, y: 10};
+  let float = Point {x: 1.0, y: 4.0};
+}
+```
+
+The syntax for structs are very similar to functions. First, we decalre the type paramter inside angle brackets just after the name. Then we can use the generic as field types.
+
+Note that because there is only one generic type (`Point<T>`), and that both `x` and `y` are `T`, they must have the same type. If you tried to create a instance of `Point` with different types, it would cause a compiler error.
+
+To have them be different types, they must have different genercs. This can be done like so:
+
+```rust
+struct Point<T, U> {
+  x: T,
+  y: U,
+}
+
+fn main() {
+  let both_int = Point {x: 5, y: 10};
+  let both_float = Point {x: 1.0, y: 4.0};
+  let int_and_float = Point {x: 5, y: 4.0};
+}
+```
+
+Generics can also be used in enum definations:
+
+```rust
+enum Option<T> {
+    Some(T),
+    None,
+}
+```
+
+Enums can also use multiple generics: 
+
+```rust
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+The result enum is generic with two types, `T` and `E`, and has two variants,
+`Ok` and `Err`. This makes it easy to insert concrete types into place of it.
+
+You can also use generics in methods:
+
+```rust
+struct Point<T> {
+    x: T,
+    y: T,
+}
+impl<T> Point<T> {
+    fn x(&self) -> &T {
+        &self.x
+    }
+}
+
+fn main() {
+    let p = Point { x: 5, y: 10 };
+
+    println!("p.x = {}", p.x());
+}
+```
+
+Here we have defined a method named `x` on `Point<T>` that returns a referance to the
+data in the field x.
+
+One thing to note is that we must declare `T` just after `impl` so we can use it to
+spesficy that we're impliemntion methods on type `T`.
+
+
+You can also spesicy methods that can only be used on spesfic types, like so:
+
+```rust
+impl Point<f32> {
+    fn distance_from_origin(&self) -> f32 {
+        (self.x.powi(2)) + self.y.powi(2)).sqrt()
+      }
+  }
+```
+
+This means that this code will not compile if used on a type other than `f32`.
+
+You won't always want to use the same generic paramaters for method signatures, like in this example:
+
+```rust
+struct Point<X1, Y1> {
+    x: X1,
+    y: Y1,
+}
+
+impl<X1, Y1> Point<X1, Y1> {
+  fn mixup<X2, Y2>(self, other: Point<X2, Y2>) -> Point<X1, Y2> {
+      Point {x: self.x, y: other.y,}
+    }
+}
+
+fn main() {
+    let p1 = Point {x: 5, y: 10.4};
+    let p2 = Point {x: "hello", y: 'c'};
+
+    let p3 = p1.mixup(p2);
+
+    println!("p3.x = {}, p3.y = {}", p3.x, p3.y);
+  }
+```
+
+This is mostly used to make it more clear and readable.
+
+### performance of Generics
+
+Rust implements code in such a way that generics don't cause any kind of performance loss, than it would with concrete types.
+It does this by using monomorphization, which is the process of turning generic code into specfic code by filling in concrete types.
+
