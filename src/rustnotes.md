@@ -1032,8 +1032,286 @@ fn main() {
 
 This is mostly used to make it more clear and readable.
 
-### performance of Generics
+### Performance of Generics
 
 Rust implements code in such a way that generics don't cause any kind of performance loss, than it would with concrete types.
 It does this by using monomorphization, which is the process of turning generic code into specfic code by filling in concrete types.
 
+## Traits
+
+A trait is something that tells the Rust compiler about the functionality a type has and can share with other types. Traits are similar to interfaces in other languages, though they have some differences.
+
+#### Defining a Trait
+
+The behaviour of a type consists of methods called on the type. Different types share the same behaviour if the share the same method calls. A trait defination is a way to group methods together to define a set  of behaviours nessercary to accomplish some purpose.
+
+Say for example, we have multiple structs that hold various kinds and amounts of text.
+A `NewsArticle` struct holds a news story filled in a particular location while a 
+`Tweet` can have 280 characters along with metadata.
+
+We want to make a media agregator named aggregator that can display summaries of data that might be
+stored in a news article or tweet instance. To do this, we need a summary from each type.
+The following show the defination of a public `Summary` trait that expresses this behaviour.
+
+```rust
+pub trait Summary {
+    fn summarize(&self) -> String;
+  }
+```
+
+Here, we use the `trait` keyword and then the traits name. We have also declared it as public so
+that crates can use this trait to. Inside the trait block, we've decalred the method that describe
+the behaviours of the types that implient this trait. 
+
+Other crates can also bring in the `Summary` trait into scope to implement the trait on their own types. On restrstrction is that you can only impliment a trait is if either the trait or the type is local. We can implement std traits like `Display` on a custom type like `Tweet`, or we can impliment `Summary` on a `Vec<>` in our crate. We cannot, however implement 
+external traits on external types. For example, we can't implement the `Display` trait on `Vec<>` within our crate, because they are both external and not local to our crate.
+
+
+#### Default Behaviours
+
+Sometimes it's useful to have default behaviour for some of the methods rather than requring implementations for every type. For example:
+
+```rust
+pub trait Summary {
+    fn summarize(&self) -> String  {
+        String::from("(Read more...)")
+      }
+  }
+
+pub struct NewsArticle {
+    pub headline: String,
+    pub location: String, 
+    pub author: String,
+    pub content: String,
+  }
+impl Summary for NewsArticle {}
+
+pub struct Tweet {
+    pub username: String,
+    pub content: String,
+    pub reply: bool,
+    pub retweet: bool,
+  }
+
+impl Summary for Tweet {
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.username, self.content)
+      }
+  }
+```
+
+```rust
+fn main() {
+        let article = NewsArticle {
+        headline: String::from("Penguins win the Stanley Cup Championship!"),
+        location: String::from("Pittsburgh, PA, USA"),
+        author: String::from("Iceburgh"),
+        content: String::from(
+            "The Pittsburgh Penguins once again are the best \
+             hockey team in the NHL.",
+        ),
+    };
+
+    println!("New article available! {}", article.summarize());
+
+  }
+
+```
+
+This will output `New Article avaliable! (Read more...)`, and this is because the `summarize` function has a default return value. The NewsArticle type doesn't overwrite this, so it doesn't change when it gets called.
+
+
+You can also pass in traits as paramaters. For instance:
+
+```rust
+pub fn notify(item: &impl Summary) {
+    println!("Breaking News! {}", item.summarize());
+  }
+```
+
+
+This process is called binding to a trait. This method is also syntatic sugar. Noramally a trait bound looks like this:
+```rust
+pub fn notify<T: Summary>(item: &T) {
+    println!("Breaking News! {}", item.summarize());
+  }
+```
+
+You can bind multiple traits to one paramter like this: 
+
+```rust
+pub fn notify(item: &(impl Summary + Display)) {
+```
+
+This will impliement both traits for them. Using too many trait bounds, however, can look bad, which is where the `where` clause comes in. It looks like this: 
+
+```rust
+fn some_function<T, U>(t: &T, u: &U) -> i32
+  where T: Display + Clone,
+        U: Clone + Debug
+  {
+```
+
+This is much better compared to this: 
+
+```rust
+fn some_function<T: Display + Clone, U: Clone + Debug>(t: &T, u: &U) -> i32 {
+```
+
+You can also return types that impliment trats. For Example:
+
+```rust
+fn returns_summarizable() -> impl Summary {
+    Tweet {
+        username: String::from("horse_ebooks"),
+        content: String::from("Of course, as you probably already know, people"),
+        reply: false,
+        retweet: false,
+      }
+  }
+```
+
+You can also use traits to conditaonlly apply methods. Like so:
+
+```rust
+use std::fmt::Display;
+
+struct Pair<T> {
+    x: T,
+    y: T,
+  }
+
+  impl<T> Pair<T> {
+      fn new(x: T, y: T) -> Self {
+          Self {x, y}
+        }
+    }
+
+impl<T: Display + PartialOrd> Pair<T> {
+    fn cmp_display(&self) {
+        if self.x >= self.y {
+            println!("The largest member is x = {}", self.x);
+          } else {
+              println!("The largest number is y = {}", self.y);
+            }
+      }
+  }
+```
+
+### Lifetimes
+
+One thing that wasn't discussed earlier was that every referance in Rust has a lifetime, which is the scope for which it is valid. Most of the time, lifetimes are implicit. 
+We must annotate lifetimes when the  lifetims of referances could be related. Annotating lifetimes is not a common concept in most programing  languages. 
+
+Consider this example:
+```rust
+    {
+        let r;
+
+        {
+            let x = 5;
+            r = &x;
+        }
+
+        println!("r: {}", r);
+    }
+```
+
+This code will not compile. This is because when we try to print `r`, x's lifetime had ended, as in, it didn't live long enough. `r` is trying to referance something that doesn't exist.
+
+The Rust compiler has a borrow checker which it uses to compare scoeps to validate referances. Here is the same thing as above with annotation. 
+
+```rust
+
+
+ [This code does not compile!] 
+    {
+        let r;                // ---------+-- 'a
+                              //          |
+        {                     //          |
+            let x = 5;        // -+-- 'b  |
+            r = &x;           //  |       |
+        }                     // -+       |
+                              //          |
+        println!("r: {}", r); //          |
+    }                         // ---------+
+/* 'a and 'b repersent x and r */
+```
+
+The solution to this, is simple:
+
+```rust
+{
+        let x = 5;            // ----------+-- 'b
+                              //           |
+        let r = &x;           // --+-- 'a  |
+                              //   |       |
+        println!("r: {}", r); //   |       |
+                              // --+       |
+    }                         // ----------+
+}
+```
+
+Here's a program that will return the longer of two string slice:
+
+```rust
+fn main() {
+    let string1 = String::from("abcd");
+    let string2 = "xyz";
+
+    let result = longest(string1.as_str(), string2);
+    println!("The longest is: {} ", result);
+  }
+```
+
+A `longest` function implimented like this will fail to compile because Rust doesn't know what the function is going to return as a referance: 
+
+```rust
+fn longest(x: &str, y: &str) -> &str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+```
+
+#### Lifetime annotations
+
+Lifetime annoations *do not* change how long any of the refererances live. Just as functions can accept any type when the declaration spesficies a generic type paramater, they can alsoaccept referances using a generic lifetime paramater. Lifetime annoatations describe the relationships of the lifetimes to each other without affecting the lifetimes. 
+
+To decalre a lifetime annoation, the paramter must begin with an apostrophe `'` and are usually all lowercase, and short. Most commonly, `'a` is sued. We place lifetime paramaters after the ampersand of a referance. Here is an example:
+
+```rust
+&i32    // a single referance
+&'a i32 // a referance with an explcit lifetime
+&'a mut i32 // a mutable referance with an explcit lifetime 
+```
+
+Here is the longest function using lifetime generics:
+
+```rust
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+```
+
+The contraint is that the lifeimtes of the paramaters and the returned referance are related that the returned referance will be valid as long as both the paramaters are. 
+
+This tells Rust that the retuerned referance is only valid as long as both paramters are, for whatever lifetime that is.
+
+Structs can also have lifetime referances which say that that the instance can't outlive a borrowed field. 
+
+There are are also 3 lifetime elision rules. They are the following. 
+
+1. Each Paramater gets its own lifetime paramter, such as `fn foo<'a>(x: &'a i32)`; a function with two paramters gets two seperate lifetime paraaters (`fn foo<'a, 'b>(x: &'a i32, y: &'b i32)`); and so on.
+2. If there is one input lifetime parameter, that lifetime is assigned to all output lifetime parameters: `fn foo<'a>(x: &'a i32) -> &'a i32`.
+3. The third and final rule is that if there is multiple input lifetime parameters, but one of them is `&self` or `&mut self`, the lifetime of self is assigned to all output lifetime parameters. 
+
+##### The Static Lifetime
+
+One special lifetime is `'static`, which it can live for the entire duration of the program. All string literals are `'static`. 
