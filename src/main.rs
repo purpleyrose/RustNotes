@@ -1,19 +1,50 @@
-struct Point<X1, Y1> {
-    x: X1,
-    y: Y1,
+#[derive(PartialEq, Debug)]
+struct Shoe {
+    size: u32,
+    style: String,
 }
 
-impl<X1, Y1> Point<X1, Y1> {
-  fn mixup<X2, Y2>(self, other: Point<X2, Y2>) -> Point<X1, Y2> {
-      Point {x: self.x, y: other.y,}
+fn shoes_in_size(shoes: Vec<Shoe>, shoe_size: u32) -> Vec<Shoe> {
+    shoes.into_iter().filter(|s| s.size == shoe_size).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn filters_by_size() {
+        let shoes = vec![
+            Shoe {
+                size: 10,
+                style: String::from("sneaker"),
+            },
+            Shoe {
+                size: 13,
+                style: String::from("sandal"),
+            },
+            Shoe {
+                size: 10,
+                style: String::from("boot"),
+            },
+        ];
+        let in_my_size = shoes_in_size(shoes, 10);
+
+        assert_eq!(
+            in_my_size,
+            vec![
+                Shoe {
+                    size: 11,
+                    style: String::from("sneaker")
+                },
+                Shoe {
+                    size: 10,
+                    style: String::from("boot")
+                }
+            ]
+        );
     }
 }
 
-fn main() {
-    let p1 = Point {x: 5, y: 10.4};
-    let p2 = Point {x: "hello", y: 'c'};
-
-    let p3 = p1.mixup(p2);
-
-    println!("p3.x = {}, p3.y = {}", p3.x, p3.y);
-}
+fn main() {}

@@ -1,4 +1,4 @@
- Rust Notes
+Rust Notes
 
 ## Some notes I found helpful when reading "The Book"
 
@@ -1314,4 +1314,251 @@ There are are also 3 lifetime elision rules. They are the following.
 
 ##### The Static Lifetime
 
-One special lifetime is `'static`, which it can live for the entire duration of the program. All string literals are `'static`. 
+One special lifetime is `'static`, which it can live for the entire duration of the program. All string literals are `'static`.
+
+
+## Making Tests
+Rust has the ability to make automated tests directly within the language. The process for doing this is:
+  1. Set up any needed data or state
+  2. Run the code you want to test
+  3. Assert the results are what you expect 
+
+At the most basic, a test is just a function that has the test arttribute. Atrtributes are just metadata about a rust program. For instace, here is a function that will run a test when we run the command `cargo test`:
+
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn exploration() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+```
+
+ This will check that, in fact, 2 + 2 = 4. It will compile and then test that that is true, if it is, the test passes. The `assert!` macro is useful when you want to ensure some condition is true.  
+
+You can also test for equality using the `assert_eq!` and `assert_ne!` macros. If the value on the left matches (or doesn't match) the value of the left, the test will fail.
+
+You can also say that a test should panic based on a value, for example:
+
+```rust
+pub struct Guess {
+    value: i32,
+  }
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {}", value);
+          }
+
+          Guess { value }
+      }
+  }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn greater_than_100() {
+        Guess::new(200);
+      }
+  }
+```
+
+This test will pass if the program panics. 
+
+You can also use `Result<T, E>` for tests, I.E:
+
+```rust
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn it_works() -> Result<(), String> {
+      if 2 + 2 == 4 {
+          Ok(())
+        }
+        else {
+            Err(String::from("two plus two does not equal four"))
+          }
+    }
+  }
+```
+
+Because of this, you can use the `?` operator, which can be more consice. 
+
+#### `cargo test` flags
+
+You can set various flags when running `cargo test`. Here is a list of them:
+
+
+| Name    | Command    | Function    |
+|---------------- | --------------- | --------------- |
+| Parralel Threading     | `cargo test --test-threads=1`    | Sets the maximum thread count to 1 to force the tests to run in consectuvily   |
+| Showing Function Output.    | `cargo test --show-output`    | Shows the ouput of things logged to stdout    |
+| Single Tests | `cargo test <test_name>`   | Only runs the spesfic test   |
+|  Filtering  | `cargo test <duplicate_test_name>`   | Will only run tests with that name, if there are multiple, also run them  |
+|  Ignore Test| `#[ignore]` | When testing this, cargo will ignore this test.
+| Running ignored tests | `cargo test --ignore` | This will run all tests, including ones marked with `#[ignore]`
+
+
+#### Test Organization 
+
+We can run unit tests by testing indvidual functions. Rust also has the ability to test private functions. 
+
+We can do intergration tests in Rust as well. Intergration tests are tests that make sure features of an external library don't conflict with out existing code. We can make a `tests` 
+dir at the top of our project, next to `src`. Ann intergration test might look like this:
+
+```rust
+use adder; // A module for adding 
+
+#[test]
+fn it_adds_two {
+    assert_eq!(4, adder::add_two(2));
+  }
+```
+
+## IO Project 
+
+The next section in the book is about making a `grep` like program. Here is my implimentation of it:
+
+src/main.rs:
+
+```rust
+use minigrep::Config;
+use owo_colors::colors;
+use owo_colors::colors::*;
+use owo_colors::OwoColorize;
+use std::env;
+use std::process;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let config = Config::new(&args).unwrap_or_else(|err| {
+        eprintln!("Problem Parsing the arguemtn: {}", err);
+        process::exit(1);
+      });
+
+    println!(
+        "Searching for {}",
+        config.query.fg::<Green>().bg::<colors::Default>()
+    );
+    println!(
+        "In File {}",
+        config.filename.fg::<Green>().bg::<colors::Default>()
+    );
+
+    if let Err(e) = minigrep::run(config) {
+        eprintln!("Application Error: {}", e);
+        process::exit(1);
+    }
+  }
+```
+
+src/lib.rs:
+
+```rust
+use owo_colors::colors;
+use owo_colors::colors::*;
+use owo_colors::OwoColorize;
+use owo_colors::Rgb;
+use std::env;
+use std::error::Error;
+use std::fs;
+
+pub struct Config {
+    pub query: String,
+    pub filename: String,
+    pub case_sensitive: bool,
+}
+
+impl Config {
+    pub fn new(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 3 {
+            return Err("Not enough arguments");
+        }
+
+        let query = args[1].clone();
+        let filename = args[2].clone();
+        let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        Ok(Config {
+            query,
+            filename,
+            case_sensitive,
+        })
+    }
+}
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let contents = fs::read_to_string(config.filename)?;
+
+    let results = if config.case_sensitive {
+        search_case_insensitive(&config.query, &contents)
+    } else {
+        search(&config.query, &contents)
+    };
+
+    for line in results {
+        println!("{}", line.fg::<Red>().bg::<colors::Default>());
+    }
+
+    Ok(())
+}
+
+pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.contains(query) {
+            results.push(line);
+        }
+    }
+
+    results
+}
+
+pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
+    let query = query.to_lowercase();
+    let mut results = Vec::new();
+
+    for line in contents.lines() {
+        if line.to_lowercase().contains(&query) {
+            results.push(line);
+        }
+    }
+    results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn one_result() {
+        let query = "duct";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Duct Tape.";
+
+        assert_eq!(vec!["safe, fast, productive."], search(query, contents));
+    }:
+    #[test]
+    fn case_insensitive() {
+        let query = "rUsT";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Trust me.";
+        assert_eq!(
+            vec!["Rust:", "Trust me."],
+            search_case_insensitive(query, contents)
+        )
+    }
+}
+```
+
+
